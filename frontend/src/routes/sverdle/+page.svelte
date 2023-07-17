@@ -258,7 +258,7 @@
 		filter: drop-shadow(3px 3px 10px var(--color-bg-0));
 	}
 
-	.letter {
+	.letter { 
 		aspect-ratio: 1;
 		width: 100%;
 		display: flex;
