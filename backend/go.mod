@@ -5,7 +5,13 @@ go 1.19
 require github.com/gofiber/fiber/v2 v2.48.0
 
 require (
+	github.com/gofiber/utils v0.0.10 // indirect
+	github.com/gorilla/schema v1.1.0 // indirect
+)
+
+require (
 	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/gofiber/fiber v1.14.6
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -20,5 +26,5 @@ require (
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	gorm.io/driver/sqlite v1.5.2 // indirect
-	gorm.io/gorm v1.25.2 // indirect
+	gorm.io/gorm v1.25.2
 )
