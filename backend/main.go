@@ -1,23 +1,17 @@
 package main
 
 import (
+	"backend/technologies"
 	"encoding/csv"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
-
-type Product struct {
-	gorm.Model
-	Code  string
-	Price uint
-}
 
 // FormFile represents multipart form file
 type FormFile struct {
@@ -30,21 +24,6 @@ type FormFile struct {
 }
 
 func main() {
-
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
-	if err != nil {
-		fmt.Println("failed to connect database")
-		panic("failed to connect database")
-	}
-
-	// Migrate the schema
-	db.AutoMigrate((Product{}))
-
-	// Create
-	db.Create(&Product{Code: "D42", Price: 100})
-
-	var product Product
-	db.First(&product, 1)
 
 	app := fiber.New()
 	app.Use(cors.New())
@@ -61,26 +40,25 @@ func main() {
 			"data": "products",
 		})
 	})
-
-	app.Post(("/upload"), func(c *fiber.Ctx) error {
+	app.Post("/upload", func(c *fiber.Ctx) error {
 		file, err := c.FormFile("file")
 		if err != nil {
 			log.Println(err)
-			return c.SendStatus(fiber.StatusBadRequest) // => 400 "Bad Request"
+			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 		}
 
 		// Save the file
 		filePath := fmt.Sprintf("./%s", file.Filename)
 		if err := c.SaveFile(file, filePath); err != nil {
 			log.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError) // => 500 "Internal Server Error"
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
 		// Open the file
 		f, err := os.Open(filePath)
 		if err != nil {
 			log.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError) // => 500 "Internal Server Error"
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 		defer f.Close()
 
@@ -89,11 +67,45 @@ func main() {
 		records, err := r.ReadAll()
 		if err != nil {
 			log.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError) // => 500 "Internal Server Error"
+			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		}
 
-		// Return the records as JSON
-		return c.JSON(records)
+		// Convert CSV records to JSON-friendly structure
+		var result []map[string]interface{}  // Use 'interface{}' to allow adding a slice of strings
+		headers := records[0]                // Assume the first record is the headers
+		for _, record := range records[1:] { // Skip the headers
+			row := make(map[string]interface{}) // Use 'interface{}' to allow adding a slice of strings
+			for i, header := range headers {
+				row[header] = record[i]
+
+				// If the header is "Website", check if the website is active and what technologies are used
+				if header == "Website" {
+					resp, err := http.Get(record[i])
+					if err != nil || resp.StatusCode != 200 {
+						row["Status"] = "inactive"
+					} else {
+						row["Status"] = "active"
+						techs, err := technologies.CheckTechnology(record[i])
+						if err != nil {
+							log.Println(err)
+							// handle error appropriately here
+						}
+						row["Technologies"] = strings.Join(techs, ", ")
+						if err != nil {
+							log.Println("Error checking technologies:", err)
+						} else {
+							row["Technologies"] = techs
+						}
+					}
+				}
+			}
+			result = append(result, row)
+		}
+		defer os.Remove(filePath)
+
+		// Return the result as JSON
+		return c.JSON(result)
 	})
+	
 	log.Fatal(app.Listen(":3000"))
 }
